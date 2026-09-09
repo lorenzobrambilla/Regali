@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro Regali Fatti (Protetti)</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --primary: #0d9488;
+      --primary-hover: #0f766e;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --danger: #ef4444;
+      --accent: #f0fdf4;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+    }
+
+    h1, h2 { margin-top: 0; }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid var(--border);
+    }
+
+    /* Modal per la Password */
+    #auth-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .auth-box {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .status-badge {
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background-color: #dcfce7;
+      color: #15803d;
+      display: inline-block;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group.full-width { grid-column: span 2; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #475569;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background-color: var(--primary-hover); }
+
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      background-color: var(--accent);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      border: 1px solid #bbf7d0;
+    }
+
+    .gift-card {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .gift-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #e0f2fe;
+      color: #0369a1;
+      margin-right: 6px;
+    }
+
+    .badge-year { background-color: #f1f5f9; color: #475569; }
+    .gift-meta { font-size: 0.85rem; color: #64748b; margin-top: 6px; }
+    .price-tag { font-weight: bold; color: var(--primary-hover); font-size: 1.1rem; text-align: right; }
+
+    .btn-delete {
+      background: none;
+      color: var(--danger);
+      border: none;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      margin-top: 8px;
+      display: block;
+      margin-left: auto;
+    }
+
+    @media (max-width: 480px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full-width { grid-column: span 1; }
+    }
+  </style>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<!-- SCHERMATA PASSWORD DI ACCESSO -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>🔒 Accesso Protetto</h2>
+    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">Inserisci la password per accedere al registro regali.</p>
+    <input type="password" id="input-password" placeholder="Password di accesso" style="margin-bottom: 12px;" onkeypress="if(event.key==='Enter') unlockApp()">
+    <button onclick="unlockApp()">Accedi</button>
+  </div>
+</div>
+
+<div class="container" id="main-content" style="display: none;">
+  <h1>🎁 Registro Regali Fatti</h1>
+  <div class="status-badge">🟢 Cloud Protetto</div>
+
+  <!-- FORM NUOVO REGALO -->
+  <div class="card">
+    <h2>Aggiungi Regalo</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="person">A chi? (Nome)</label>
+        <input type="text" id="person" placeholder="Es. Marco, Mamma, Francesca">
+      </div>
+
+      <div class="form-group">
+        <label for="occasion">Occasione</label>
+        <select id="occasion">
+          <option value="Compleanno">Compleanno</option>
+          <option value="Natale">Natale</option>
+          <option value="Anniversario">Anniversario</option>
+          <option value="Laurea">Laurea</option>
+          <option value="Matrimonio">Matrimonio</option>
+          <option value="Altro">Altro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="gift">Cosa hai regalato?</label>
+        <input type="text" id="gift" placeholder="Es. Orologio, Libro, Cena">
+      </div>
+
+      <div class="form-group">
+        <label for="price">Prezzo (€)</label>
+        <input type="number" id="price" step="0.01" placeholder="0.00">
+      </div>
+
+      <div class="form-group">
+        <label for="year">Anno / Data</label>
+        <input type="number" id="year">
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Note (opzionale)</label>
+        <input type="text" id="notes" placeholder="Es. Taglia M, Preso su Amazon">
+      </div>
+
+      <div class="form-group full-width">
+        <button onclick="addGift()">Salva Regalo nel Cloud</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIEPILOGO E FILTRI -->
+  <div class="card">
+    <h2>Storico & Ricerca</h2>
+
+    <div class="stats-bar" id="stats">
+      <span>Totale Regali: <b>0</b></span>
+      <span>Spesa Totale: <b>€ 0.00</b></span>
+    </div>
+
+    <div class="form-group">
+      <label for="search">Cerca per Persona o Regalo</label>
+      <input type="text" id="search" placeholder="Scrivi un nome per vedere i regali passati..." oninput="renderGifts()">
+    </div>
+
+    <div id="gifts-list">
+      <p style="color: #64748b; text-align: center;">Caricamento regali...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // LA TUA PASSWORD DI ACCESSO È: Regali2026
+  // ==========================================
+  const SECRET_PASSWORD = "Regali2026!";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBlCGHnL0lksp2yt34bB3z3VPY_cUZgdb0",
+    authDomain: "lorenzo-8c595.firebaseapp.com",
+    databaseURL: "https://lorenzo-8c595-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "lorenzo-8c595",
+    storageBucket: "lorenzo-8c595.firebasestorage.app",
+    messagingSenderId: "635712809484",
+    appId: "1:635712809484:web:92decc4c3718f186a81c29"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database().ref('registro_regali');
+
+  let gifts = [];
+
+  function checkAuth() {
+    const savedPass = localStorage.getItem('regali_auth_token');
+    if (savedPass === SECRET_PASSWORD) {
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      initApp();
+    }
+  }
+
+  function unlockApp() {
+    const entered = document.getElementById('input-password').value;
+    if (entered === SECRET_PASSWORD) {
+      localStorage.setItem('regali_auth_token', entered);
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      initApp();
+    } else {
+      alert("Password errata!");
+    }
+  }
+
+  function initApp() {
+    document.getElementById('year').value = new Date().getFullYear();
+
+    db.on('value', (snapshot) => {
+      const data = snapshot.val();
+      gifts = [];
+      if (data) {
+        Object.keys(data).forEach(key => {
+          gifts.push({ id: key, ...data[key] });
+        });
+      }
+      gifts.sort((a, b) => b.year - a.year || b.timestamp - a.timestamp);
+      renderGifts();
+    });
+  }
+
+  function addGift() {
+    const person = document.getElementById('person').value.trim();
+    const occasion = document.getElementById('occasion').value;
+    const giftName = document.getElementById('gift').value.trim();
+    const price = parseFloat(document.getElementById('price').value) || 0;
+    const year = parseInt(document.getElementById('year').value) || new Date().getFullYear();
+    const notes = document.getElementById('notes').value.trim();
+
+    if (!person || !giftName) {
+      alert("Inserisci almeno il nome della persona e cosa hai regalato.");
+      return;
+    }
+
+    db.push({
+      person,
+      occasion,
+      giftName,
+      price,
+      year,
+      notes,
+      timestamp: Date.now()
+    });
+
+    document.getElementById('person').value = '';
+    document.getElementById('gift').value = '';
+    document.getElementById('price').value = '';
+    document.getElementById('notes').value = '';
+  }
+
+  function deleteGift(id) {
+    if (confirm("Vuoi davvero eliminare questo regalo?")) {
+      db.child(id).remove();
+    }
+  }
+
+  function renderGifts() {
+    const searchFilter = document.getElementById('search').value.toLowerCase();
+    const listEl = document.getElementById('gifts-list');
+    const statsEl = document.getElementById('stats');
+
+    const filteredGifts = gifts.filter(g => 
+      g.person.toLowerCase().includes(searchFilter) || 
+      g.giftName.toLowerCase().includes(searchFilter) ||
+      g.occasion.toLowerCase().includes(searchFilter)
+    );
+
+    const totalSpent = filteredGifts.reduce((sum, g) => sum + g.price, 0);
+    statsEl.innerHTML = `
+      <span>Regali mostrati: <b>${filteredGifts.length}</b></span>
+      <span>Spesa Totale: <b>€ ${totalSpent.toFixed(2)}</b></span>
+    `;
+
+    if (filteredGifts.length === 0) {
+      listEl.innerHTML = '<p style="color: #64748b; text-align: center;">Nessun regalo trovato.</p>';
+      return;
+    }
+
+    listEl.innerHTML = filteredGifts.map(g => `
+      <div class="gift-card">
+        <div class="gift-info">
+          <h3>${g.person}</h3>
+          <div>
+            <span class="badge badge-year">${g.year}</span>
+            <span class="badge">${g.occasion}</span>
+          </div>
+          <div class="gift-meta" style="margin-top: 8px;">
+            <b>Regalo:</b> ${g.giftName}
+            ${g.notes ? `<br><i>Note: ${g.notes}</i>` : ''}
+          </div>
+        </div>
+        <div>
+          <div class="price-tag">${g.price > 0 ? '€ ' + g.price.toFixed(2) : '-'}</div>
+          <button class="btn-delete" onclick="deleteGift('${g.id}')">Elimina</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Verifica se l'utente è già autenticato sul browser
+  checkAuth();
+</script>
+
+</body>
+</html>

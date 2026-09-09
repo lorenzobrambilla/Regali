@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Divisione Spese Vacanza (Condivisa)</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --text: #1f2937;
+      --border: #e5e7eb;
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    h1, h2, h3 { margin-top: 0; }
+
+    .card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .form-group { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background-color: var(--primary-hover); }
+
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      border: 1px solid var(--border);
+    }
+
+    .checkbox-item input { width: auto; margin: 0; }
+
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .list-item:last-child { border-bottom: none; }
+
+    .btn-delete {
+      background: none;
+      color: var(--danger);
+      border: none;
+      width: auto;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .settlement {
+      background-color: #eff6ff;
+      border-left: 4px solid var(--primary);
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .status-badge {
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background-color: #dcfce7;
+      color: #15803d;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+  </style>
+
+  <!-- Caricamento SDK Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <h1>🌴 Spese Vacanza (In Tempo Reale)</h1>
+  <div class="status-badge">🟢 Connesso al Cloud</div>
+
+  <!-- FORM NUOVA SPESA -->
+  <div class="card">
+    <h2>Aggiungi Spesa</h2>
+    
+    <div class="form-group">
+      <label for="description">Descrizione</label>
+      <input type="text" id="description" placeholder="Es. Cena di pesce, Autostrada">
+    </div>
+
+    <div class="form-group">
+      <label for="amount">Importo Totale (€)</label>
+      <input type="number" id="amount" step="0.01" placeholder="0.00">
+    </div>
+
+    <div class="form-group">
+      <label for="payer">Chi ha pagato?</label>
+      <select id="payer">
+        <option value="Coppia 1">Coppia 1</option>
+        <option value="Coppia 2">Coppia 2</option>
+        <option value="Coppia 3">Coppia 3</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Per chi è questa spesa?</label>
+      <div class="checkbox-group">
+        <label class="checkbox-item">
+          <input type="checkbox" class="participant-pair" value="Coppia 1" checked onchange="updatePeopleCount()"> Coppia 1
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" class="participant-pair" value="Coppia 2" checked onchange="updatePeopleCount()"> Coppia 2
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" class="participant-pair" value="Coppia 3" checked onchange="updatePeopleCount()"> Coppia 3
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="peopleCount">Numero totale di persone per questa spesa</label>
+      <select id="peopleCount">
+        <option value="6">6 persone (2 per coppia selezionata)</option>
+        <option value="5">5 persone</option>
+        <option value="4">4 persone</option>
+        <option value="3">3 persone</option>
+        <option value="2">2 persone</option>
+        <option value="1">1 persona</option>
+      </select>
+    </div>
+
+    <button onclick="addExpense()">Aggiungi Spesa</button>
+  </div>
+
+  <!-- RIEPILOGO E CONTI -->
+  <div class="card">
+    <h2>Conguaglio Finale</h2>
+    <div id="balances-summary">
+      <p style="color: #6b7280;">Nessuna spesa inserita.</p>
+    </div>
+    <div id="settlements-container" style="margin-top: 15px;"></div>
+  </div>
+
+  <!-- ELENCO SPESE -->
+  <div class="card">
+    <h2>Storico Spese</h2>
+    <div id="expenses-list">
+      <p style="color: #6b7280;">Caricamento spese dal cloud...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ⚠️ SOSTITUISCI QUESTO OGGETTO CON IL TUO CONFIG DI FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyBlCGHnL0lksp2yt34bB3z3VPY_cUZgdb0",
+  authDomain: "lorenzo-8c595.firebaseapp.com",
+  projectId: "lorenzo-8c595",
+  storageBucket: "lorenzo-8c595.firebasestorage.app",
+  messagingSenderId: "635712809484",
+  appId: "1:635712809484:web:92decc4c3718f186a81c29",
+  measurementId: "G-TNNP10RGBM"
+};
+
+  // Inizializzazione Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+  let expenses = [];
+
+  // Ascolto in TEMPO REALE delle modifiche nel cloud
+  db.on('value', (snapshot) => {
+    const data = snapshot.val();
+    expenses = [];
+    if (data) {
+      Object.keys(data).forEach(key => {
+        expenses.push({ id: key, ...data[key] });
+      });
+    }
+    renderExpenses();
+    calculateBalances();
+  });
+
+  function updatePeopleCount() {
+    const checkedPairs = document.querySelectorAll('.participant-pair:checked').length;
+    const peopleSelect = document.getElementById('peopleCount');
+    const defaultPeople = checkedPairs * 2;
+    if (defaultPeople > 0 && defaultPeople <= 6) {
+      peopleSelect.value = defaultPeople;
+    }
+  }
+
+  function addExpense() {
+    const descInput = document.getElementById('description');
+    const amountInput = document.getElementById('amount');
+    const payerInput = document.getElementById('payer');
+    const peopleSelect = document.getElementById('peopleCount');
+    const pairCheckboxes = document.querySelectorAll('.participant-pair:checked');
+
+    const description = descInput.value.trim();
+    const amount = parseFloat(amountInput.value);
+    const payer = payerInput.value;
+    const totalPeople = parseInt(peopleSelect.value);
+    const selectedPairs = Array.from(pairCheckboxes).map(cb => cb.value);
+
+    if (!description || isNaN(amount) || amount <= 0) {
+      alert("Inserisci una descrizione e un importo valido.");
+      return;
+    }
+
+    if (selectedPairs.length === 0) {
+      alert("Seleziona almeno una coppia coinvolta nella spesa.");
+      return;
+    }
+
+    // Salva direttamente nel cloud
+    db.push({
+      description,
+      amount,
+      payer,
+      selectedPairs,
+      totalPeople,
+      timestamp: Date.now()
+    });
+
+    descInput.value = '';
+    amountInput.value = '';
+  }
+
+  function deleteExpense(id) {
+    if (confirm("Vuoi eliminare questa spesa per tutti?")) {
+      db.child(id).remove();
+    }
+  }
+
+  function renderExpenses() {
+    const listEl = document.getElementById('expenses-list');
+    if (expenses.length === 0) {
+      listEl.innerHTML = '<p style="color: #6b7280;">Nessuna spesa presente.</p>';
+      return;
+    }
+
+    listEl.innerHTML = expenses.slice().reverse().map(e => `
+      <div class="list-item">
+        <div>
+          <strong>${e.description}</strong><br>
+          <small style="color: #6b7280;">
+            Pagato da: <b>${e.payer}</b> | Diviso tra ${e.totalPeople} persone (${e.selectedPairs.join(', ')})
+          </small>
+        </div>
+        <div style="text-align: right; min-width: 100px;">
+          <span>€ ${e.amount.toFixed(2)}</span><br>
+          <button class="btn-delete" onclick="deleteExpense('${e.id}')">Elimina</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function calculateBalances() {
+    const balancesEl = document.getElementById('balances-summary');
+    const settlementsEl = document.getElementById('settlements-container');
+
+    if (expenses.length === 0) {
+      balancesEl.innerHTML = '<p style="color: #6b7280;">Nessuna spesa inserita.</p>';
+      settlementsEl.innerHTML = '';
+      return;
+    }
+
+    const couples = ['Coppia 1', 'Coppia 2', 'Coppia 3'];
+    const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const paid = { 'Coppia 1': 0, 'Coppia 2': 0, 'Coppia 3': 0 };
+    const owe = { 'Coppia 1': 0, 'Coppia 2': 0, 'Coppia 3': 0 };
+
+    expenses.forEach(e => {
+      paid[e.payer] += e.amount;
+      const costPerPerson = e.amount / e.totalPeople;
+      const pairsCount = e.selectedPairs.length;
+      const avgPeoplePerPair = e.totalPeople / pairsCount;
+
+      e.selectedPairs.forEach(pair => {
+        owe[pair] += costPerPerson * avgPeoplePerPair;
+      });
+    });
+
+    const netBalances = {};
+    couples.forEach(c => {
+      netBalances[c] = paid[c] - owe[c];
+    });
+
+    let htmlSummary = `<p><strong>Spesa Totale Vacanza:</strong> € ${totalSpent.toFixed(2)}</p><ul>`;
+    couples.forEach(c => {
+      htmlSummary += `<li><b>${c}</b>: ha pagato € ${paid[c].toFixed(2)} | Quota a carico: € ${owe[c].toFixed(2)}</li>`;
+    });
+    htmlSummary += '</ul>';
+    balancesEl.innerHTML = htmlSummary;
+
+    let debtors = [];
+    let creditors = [];
+
+    couples.forEach(c => {
+      const bal = netBalances[c];
+      if (bal < -0.01) debtors.push({ name: c, amount: -bal });
+      else if (bal > 0.01) creditors.push({ name: c, amount: bal });
+    });
+
+    let settlementHtml = '<h3>Trasferimenti necessari per pareggiare:</h3>';
+    let i = 0, j = 0;
+
+    if (debtors.length === 0 && creditors.length === 0) {
+      settlementHtml += '<p style="color: #16a34a; font-weight: 600;">Siete già perfettamente in pari!</p>';
+    } else {
+      while (i < debtors.length && j < creditors.length) {
+        let payment = Math.min(debtors[i].amount, creditors[j].amount);
+        settlementHtml += `
+          <div class="settlement">
+            <strong>${debtors[i].name}</strong> deve dare <strong>€ ${payment.toFixed(2)}</strong> a <strong>${creditors[j].name}</strong>
+          </div>`;
+
+        debtors[i].amount -= payment;
+        creditors[j].amount -= payment;
+
+        if (debtors[i].amount < 0.01) i++;
+        if (creditors[j].amount < 0.01) j++;
+      }
+    }
+
+    settlementsEl.innerHTML = settlementHtml;
+  }
+</script>
+
+</body>
+</html>

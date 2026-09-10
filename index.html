@@ -144,12 +144,6 @@
       justify-content: space-between;
     }
 
-    .chart-container {
-      position: relative;
-      max-width: 320px;
-      margin: 15px auto 20px auto;
-    }
-
     .gift-card {
       background: #fafafa;
       border: 1px solid var(--border);
@@ -232,8 +226,6 @@
   <!-- SDK Firebase Completo -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <!-- Chart.js per i Grafici -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -309,7 +301,7 @@
 
   <!-- RIEPILOGO E FILTRI -->
   <div class="card">
-    <h2>Storico & Analisi Spese</h2>
+    <h2>Storico Regali</h2>
 
     <div class="stats-bar" id="stats">
       <div class="stats-row">
@@ -320,11 +312,6 @@
         <span>Stima Idee: <b id="stat-ideas">€ 0.00</b></span>
         <span>Spesa Totale prevista: <b id="stat-total">€ 0.00</b></span>
       </div>
-    </div>
-
-    <!-- GRAFICO SPESE PER OCCASIONE -->
-    <div class="chart-container">
-      <canvas id="expenseChart"></canvas>
     </div>
 
     <!-- BARRA FILTRI -->
@@ -371,7 +358,7 @@
 </div>
 
 <script>
-  const SECRET_PASSWORD = "Regali2026!";
+  const SECRET_PASSWORD = "Regali2026";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBlCGHnL0lksp2yt34bB3z3VPY_cUZgdb0",
@@ -388,7 +375,6 @@
 
   let gifts = [];
   let editingId = null;
-  let chartInstance = null;
 
   function checkAuth() {
     const savedPass = localStorage.getItem('regali_auth_token');
@@ -542,51 +528,6 @@
     }
   }
 
-  function updateChart(dataByOccasion) {
-    const ctx = document.getElementById('expenseChart').getContext('2d');
-    const labels = Object.keys(dataByOccasion);
-    const dataValues = Object.values(dataByOccasion);
-
-    if (labels.length === 0) {
-      if (chartInstance) chartInstance.destroy();
-      return;
-    }
-
-    const colors = [
-      '#0d9488', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#64748b'
-    ];
-
-    if (chartInstance) {
-      chartInstance.data.labels = labels;
-      chartInstance.data.datasets[0].data = dataValues;
-      chartInstance.update();
-    } else {
-      chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: dataValues,
-            backgroundColor: colors.slice(0, labels.length)
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return ` ${context.label}: € ${context.raw.toFixed(2)}`;
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-  }
-
   function renderGifts() {
     const searchFilter = document.getElementById('search').value.toLowerCase();
     const yearFilter = document.getElementById('filter-year').value;
@@ -607,10 +548,9 @@
       return matchSearch && matchYear && matchOccasion && matchStatus;
     });
 
-    // Calcolo Statistiche e Dati Grafico
+    // Calcolo Statistiche
     let totalBought = 0;
     let totalIdeas = 0;
-    const occasionTotals = {};
 
     filteredGifts.forEach(g => {
       const p = g.price || 0;
@@ -618,9 +558,6 @@
         totalIdeas += p;
       } else {
         totalBought += p;
-        // Raggruppamento per il grafico delle spese reali
-        const occ = g.occasion || 'Altro';
-        occasionTotals[occ] = (occasionTotals[occ] || 0) + p;
       }
     });
 
@@ -628,8 +565,6 @@
     document.getElementById('stat-bought').innerText = '€ ' + totalBought.toFixed(2);
     document.getElementById('stat-ideas').innerText = '€ ' + totalIdeas.toFixed(2);
     document.getElementById('stat-total').innerText = '€ ' + (totalBought + totalIdeas).toFixed(2);
-
-    updateChart(occasionTotals);
 
     if (filteredGifts.length === 0) {
       listEl.innerHTML = '<p style="color: #64748b; text-align: center; margin-top: 20px;">Nessun regalo trovato con i filtri selezionati.</p>';

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registro Regali Fatti (Protetti)</title>
+  <title>Registro Regali Fatti</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -14,6 +14,9 @@
       --border: #e2e8f0;
       --danger: #ef4444;
       --accent: #f0fdf4;
+      --idea-bg: #fffbeb;
+      --idea-color: #b45309;
+      --idea-border: #fef3c7;
     }
 
     body {
@@ -28,7 +31,7 @@
 
     .container {
       width: 100%;
-      max-width: 650px;
+      max-width: 680px;
     }
 
     h1, h2 { margin-top: 0; }
@@ -42,7 +45,6 @@
       border: 1px solid var(--border);
     }
 
-    /* Modal per la Password */
     #auth-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -80,6 +82,13 @@
       gap: 12px;
     }
 
+    .filters-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
     .form-group { margin-bottom: 12px; }
     .form-group.full-width { grid-column: span 2; }
 
@@ -114,13 +123,19 @@
 
     .stats-bar {
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 4px;
       background-color: var(--accent);
       padding: 12px 16px;
       border-radius: 8px;
       margin-bottom: 15px;
       font-size: 0.9rem;
       border: 1px solid #bbf7d0;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
     }
 
     .gift-card {
@@ -134,6 +149,11 @@
       align-items: flex-start;
     }
 
+    .gift-card.is-idea {
+      background: var(--idea-bg);
+      border-color: var(--idea-border);
+    }
+
     .gift-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; }
 
     .badge {
@@ -144,28 +164,52 @@
       font-weight: 600;
       background-color: #e0f2fe;
       color: #0369a1;
-      margin-right: 6px;
+      margin-right: 4px;
     }
 
     .badge-year { background-color: #f1f5f9; color: #475569; }
+    
+    .badge-status-bought {
+      background-color: #dcfce7;
+      color: #15803d;
+    }
+
+    .badge-status-idea {
+      background-color: #fef3c7;
+      color: var(--idea-color);
+    }
+
     .gift-meta { font-size: 0.85rem; color: #64748b; margin-top: 6px; }
     .price-tag { font-weight: bold; color: var(--primary-hover); font-size: 1.1rem; text-align: right; }
 
-    .btn-delete {
-      background: none;
-      color: var(--danger);
-      border: none;
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 0.8rem;
+    .actions-group {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
       margin-top: 8px;
-      display: block;
-      margin-left: auto;
     }
 
-    @media (max-width: 480px) {
+    .btn-action {
+      background: none;
+      border: none;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .btn-toggle-status {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+
+    .btn-delete {
+      color: var(--danger);
+    }
+
+    @media (max-width: 550px) {
       .form-grid { grid-template-columns: 1fr; }
       .form-group.full-width { grid-column: span 1; }
+      .filters-grid { grid-template-columns: 1fr; }
     }
   </style>
 
@@ -186,11 +230,11 @@
 
 <div class="container" id="main-content" style="display: none;">
   <h1>🎁 Registro Regali Fatti</h1>
-  <div class="status-badge">🟢 Cloud Protetto</div>
+  <div class="status-badge" id="conn-status">🟡 Connessione in corso...</div>
 
   <!-- FORM NUOVO REGALO -->
   <div class="card">
-    <h2>Aggiungi Regalo</h2>
+    <h2>Aggiungi Regalo o Idea</h2>
     <div class="form-grid">
       <div class="form-group">
         <label for="person">A chi? (Nome)</label>
@@ -210,8 +254,16 @@
       </div>
 
       <div class="form-group">
-        <label for="gift">Cosa hai regalato?</label>
+        <label for="gift">Cosa regali / vuoi regalare?</label>
         <input type="text" id="gift" placeholder="Es. Orologio, Libro, Cena">
+      </div>
+
+      <div class="form-group">
+        <label for="status">Stato Regalo</label>
+        <select id="status">
+          <option value="bought">✅ Già Acquistato</option>
+          <option value="idea">💡 Idea / In programma</option>
+        </select>
       </div>
 
       <div class="form-group">
@@ -224,13 +276,13 @@
         <input type="number" id="year">
       </div>
 
-      <div class="form-group">
+      <div class="form-group full-width">
         <label for="notes">Note (opzionale)</label>
         <input type="text" id="notes" placeholder="Es. Taglia M, Preso su Amazon">
       </div>
 
       <div class="form-group full-width">
-        <button onclick="addGift()">Salva Regalo nel Cloud</button>
+        <button id="btn-save" onclick="addGift()">Salva Regalo nel Cloud</button>
       </div>
     </div>
   </div>
@@ -240,13 +292,51 @@
     <h2>Storico & Ricerca</h2>
 
     <div class="stats-bar" id="stats">
-      <span>Totale Regali: <b>0</b></span>
-      <span>Spesa Totale: <b>€ 0.00</b></span>
+      <div class="stats-row">
+        <span>Regali mostrati: <b id="stat-count">0</b></span>
+        <span>Speso (Acquistati): <b id="stat-bought">€ 0.00</b></span>
+      </div>
+      <div class="stats-row" style="color: #64748b; font-size: 0.85rem;">
+        <span>Stima Idee: <b id="stat-ideas">€ 0.00</b></span>
+        <span>Spesa Totale prevista: <b id="stat-total">€ 0.00</b></span>
+      </div>
     </div>
 
+    <!-- BARRA FILTRI -->
     <div class="form-group">
-      <label for="search">Cerca per Persona o Regalo</label>
-      <input type="text" id="search" placeholder="Scrivi un nome per vedere i regali passati..." oninput="renderGifts()">
+      <label for="search">Cerca per Nome o Regalo</label>
+      <input type="text" id="search" placeholder="Cerca..." oninput="renderGifts()">
+    </div>
+
+    <div class="filters-grid">
+      <div>
+        <label for="filter-year">Filtra per Anno</label>
+        <select id="filter-year" onchange="renderGifts()">
+          <option value="">Tutti gli anni</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="filter-occasion">Filtra per Occasione</label>
+        <select id="filter-occasion" onchange="renderGifts()">
+          <option value="">Tutte le occasioni</option>
+          <option value="Compleanno">Compleanno</option>
+          <option value="Natale">Natale</option>
+          <option value="Anniversario">Anniversario</option>
+          <option value="Laurea">Laurea</option>
+          <option value="Matrimonio">Matrimonio</option>
+          <option value="Altro">Altro</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="filter-status">Filtra per Stato</label>
+        <select id="filter-status" onchange="renderGifts()">
+          <option value="">Tutti gli stati</option>
+          <option value="bought">✅ Solo Acquistati</option>
+          <option value="idea">💡 Solo Idee</option>
+        </select>
+      </div>
     </div>
 
     <div id="gifts-list">
@@ -256,10 +346,7 @@
 </div>
 
 <script>
-  // ==========================================
-  // LA TUA PASSWORD DI ACCESSO È: Regali2026
-  // ==========================================
-  const SECRET_PASSWORD = "Regali2026!";
+  const SECRET_PASSWORD = "Regali2026";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBlCGHnL0lksp2yt34bB3z3VPY_cUZgdb0",
@@ -301,6 +388,10 @@
     document.getElementById('year').value = new Date().getFullYear();
 
     db.on('value', (snapshot) => {
+      document.getElementById('conn-status').innerText = '🟢 Connesso al Cloud';
+      document.getElementById('conn-status').style.backgroundColor = '#dcfce7';
+      document.getElementById('conn-status').style.color = '#15803d';
+
       const data = snapshot.val();
       gifts = [];
       if (data) {
@@ -309,89 +400,162 @@
         });
       }
       gifts.sort((a, b) => b.year - a.year || b.timestamp - a.timestamp);
+      updateYearFilterOptions();
       renderGifts();
+    }, (error) => {
+      console.error("Errore Firebase:", error);
+      document.getElementById('conn-status').innerText = '🔴 Errore Permessi Firebase';
+      document.getElementById('conn-status').style.backgroundColor = '#fee2e2';
+      document.getElementById('conn-status').style.color = '#991b1b';
     });
+  }
+
+  function updateYearFilterOptions() {
+    const yearSelect = document.getElementById('filter-year');
+    const selectedYear = yearSelect.value;
+    
+    // Ottieni lista di anni unici dai regali presenti
+    const years = [...new Set(gifts.map(g => g.year))].sort((a, b) => b - a);
+    
+    let html = '<option value="">Tutti gli anni</option>';
+    years.forEach(y => {
+      html += `<option value="${y}">${y}</option>`;
+    });
+    
+    yearSelect.innerHTML = html;
+    yearSelect.value = selectedYear;
   }
 
   function addGift() {
     const person = document.getElementById('person').value.trim();
     const occasion = document.getElementById('occasion').value;
     const giftName = document.getElementById('gift').value.trim();
+    const status = document.getElementById('status').value;
     const price = parseFloat(document.getElementById('price').value) || 0;
     const year = parseInt(document.getElementById('year').value) || new Date().getFullYear();
     const notes = document.getElementById('notes').value.trim();
 
     if (!person || !giftName) {
-      alert("Inserisci almeno il nome della persona e cosa hai regalato.");
+      alert("Inserisci almeno il nome della persona e il regalo/idea.");
       return;
     }
+
+    const btn = document.getElementById('btn-save');
+    btn.disabled = true;
+    btn.innerText = 'Salvataggio...';
 
     db.push({
       person,
       occasion,
       giftName,
+      status,
       price,
       year,
       notes,
       timestamp: Date.now()
-    });
+    }).then(() => {
+      btn.disabled = false;
+      btn.innerText = 'Salva Regalo nel Cloud';
 
-    document.getElementById('person').value = '';
-    document.getElementById('gift').value = '';
-    document.getElementById('price').value = '';
-    document.getElementById('notes').value = '';
+      document.getElementById('person').value = '';
+      document.getElementById('gift').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('notes').value = '';
+    }).catch((err) => {
+      btn.disabled = false;
+      btn.innerText = 'Salva Regalo nel Cloud';
+      alert("Impossibile salvare il regalo: " + err.message);
+    });
+  }
+
+  function toggleStatus(id, currentStatus) {
+    const newStatus = currentStatus === 'idea' ? 'bought' : 'idea';
+    db.child(id).update({ status: newStatus });
   }
 
   function deleteGift(id) {
-    if (confirm("Vuoi davvero eliminare questo regalo?")) {
-      db.child(id).remove();
+    if (confirm("Vuoi davvero eliminare questo elemento?")) {
+      db.child(id).remove().catch(err => alert("Errore eliminazione: " + err.message));
     }
   }
 
   function renderGifts() {
     const searchFilter = document.getElementById('search').value.toLowerCase();
+    const yearFilter = document.getElementById('filter-year').value;
+    const occasionFilter = document.getElementById('filter-occasion').value;
+    const statusFilter = document.getElementById('filter-status').value;
+
     const listEl = document.getElementById('gifts-list');
-    const statsEl = document.getElementById('stats');
 
-    const filteredGifts = gifts.filter(g => 
-      g.person.toLowerCase().includes(searchFilter) || 
-      g.giftName.toLowerCase().includes(searchFilter) ||
-      g.occasion.toLowerCase().includes(searchFilter)
-    );
+    const filteredGifts = gifts.filter(g => {
+      const matchSearch = (g.person && g.person.toLowerCase().includes(searchFilter)) || 
+                          (g.giftName && g.giftName.toLowerCase().includes(searchFilter)) ||
+                          (g.notes && g.notes.toLowerCase().includes(searchFilter));
+      
+      const matchYear = !yearFilter || g.year == yearFilter;
+      const matchOccasion = !occasionFilter || g.occasion === occasionFilter;
+      const matchStatus = !statusFilter || (g.status || 'bought') === statusFilter;
 
-    const totalSpent = filteredGifts.reduce((sum, g) => sum + g.price, 0);
-    statsEl.innerHTML = `
-      <span>Regali mostrati: <b>${filteredGifts.length}</b></span>
-      <span>Spesa Totale: <b>€ ${totalSpent.toFixed(2)}</b></span>
-    `;
+      return matchSearch && matchYear && matchOccasion && matchStatus;
+    });
+
+    // Calcolo Statistiche
+    let totalBought = 0;
+    let totalIdeas = 0;
+
+    filteredGifts.forEach(g => {
+      const p = g.price || 0;
+      if (g.status === 'idea') {
+        totalIdeas += p;
+      } else {
+        totalBought += p;
+      }
+    });
+
+    document.getElementById('stat-count').innerText = filteredGifts.length;
+    document.getElementById('stat-bought').innerText = '€ ' + totalBought.toFixed(2);
+    document.getElementById('stat-ideas').innerText = '€ ' + totalIdeas.toFixed(2);
+    document.getElementById('stat-total').innerText = '€ ' + (totalBought + totalIdeas).toFixed(2);
 
     if (filteredGifts.length === 0) {
-      listEl.innerHTML = '<p style="color: #64748b; text-align: center;">Nessun regalo trovato.</p>';
+      listEl.innerHTML = '<p style="color: #64748b; text-align: center; margin-top: 20px;">Nessun regalo trovato con i filtri selezionati.</p>';
       return;
     }
 
-    listEl.innerHTML = filteredGifts.map(g => `
-      <div class="gift-card">
-        <div class="gift-info">
-          <h3>${g.person}</h3>
+    listEl.innerHTML = filteredGifts.map(g => {
+      const isIdea = g.status === 'idea';
+      const statusBadge = isIdea 
+        ? '<span class="badge badge-status-idea">💡 Idea</span>' 
+        : '<span class="badge badge-status-bought">✅ Acquistato</span>';
+
+      const statusActionText = isIdea ? 'Segna come Acquistato' : 'Sposta in Idee';
+
+      return `
+        <div class="gift-card ${isIdea ? 'is-idea' : ''}">
+          <div class="gift-info">
+            <h3>${g.person}</h3>
+            <div>
+              <span class="badge badge-year">${g.year}</span>
+              <span class="badge">${g.occasion}</span>
+              ${statusBadge}
+            </div>
+            <div class="gift-meta">
+              <b>Regalo:</b> ${g.giftName}
+              ${g.notes ? `<br><i>Note: ${g.notes}</i>` : ''}
+            </div>
+          </div>
           <div>
-            <span class="badge badge-year">${g.year}</span>
-            <span class="badge">${g.occasion}</span>
-          </div>
-          <div class="gift-meta" style="margin-top: 8px;">
-            <b>Regalo:</b> ${g.giftName}
-            ${g.notes ? `<br><i>Note: ${g.notes}</i>` : ''}
+            <div class="price-tag">${g.price > 0 ? '€ ' + Number(g.price).toFixed(2) : '-'}</div>
+            <div class="actions-group">
+              <button class="btn-action btn-toggle-status" onclick="toggleStatus('${g.id}', '${g.status || 'bought'}')">${statusActionText}</button>
+              <button class="btn-action btn-delete" onclick="deleteGift('${g.id}')">Elimina</button>
+            </div>
           </div>
         </div>
-        <div>
-          <div class="price-tag">${g.price > 0 ? '€ ' + g.price.toFixed(2) : '-'}</div>
-          <button class="btn-delete" onclick="deleteGift('${g.id}')">Elimina</button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
-  // Verifica se l'utente è già autenticato sul browser
   checkAuth();
 </script>
 

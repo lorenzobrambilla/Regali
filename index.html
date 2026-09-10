@@ -121,6 +121,12 @@
 
     button:hover { background-color: var(--primary-hover); }
 
+    .btn-cancel {
+      background-color: #64748b;
+      margin-top: 8px;
+    }
+    .btn-cancel:hover { background-color: #475569; }
+
     .stats-bar {
       display: flex;
       flex-direction: column;
@@ -136,6 +142,12 @@
     .stats-row {
       display: flex;
       justify-content: space-between;
+    }
+
+    .chart-container {
+      position: relative;
+      max-width: 320px;
+      margin: 15px auto 20px auto;
     }
 
     .gift-card {
@@ -202,6 +214,10 @@
       text-decoration: underline;
     }
 
+    .btn-edit {
+      color: #0284c7;
+    }
+
     .btn-delete {
       color: var(--danger);
     }
@@ -213,8 +229,11 @@
     }
   </style>
 
+  <!-- SDK Firebase Completo -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <!-- Chart.js per i Grafici -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -232,9 +251,9 @@
   <h1>🎁 Registro Regali Fatti</h1>
   <div class="status-badge" id="conn-status">🟡 Connessione in corso...</div>
 
-  <!-- FORM NUOVO REGALO -->
-  <div class="card">
-    <h2>Aggiungi Regalo o Idea</h2>
+  <!-- FORM NUOVO / MODIFICA REGALO -->
+  <div class="card" id="form-card">
+    <h2 id="form-title">Aggiungi Regalo o Idea</h2>
     <div class="form-grid">
       <div class="form-group">
         <label for="person">A chi? (Nome)</label>
@@ -282,14 +301,15 @@
       </div>
 
       <div class="form-group full-width">
-        <button id="btn-save" onclick="addGift()">Salva Regalo nel Cloud</button>
+        <button id="btn-save" onclick="saveGift()">Salva Regalo nel Cloud</button>
+        <button id="btn-cancel" class="btn-cancel" onclick="resetForm()" style="display: none;">Annulla Modifica</button>
       </div>
     </div>
   </div>
 
   <!-- RIEPILOGO E FILTRI -->
   <div class="card">
-    <h2>Storico & Ricerca</h2>
+    <h2>Storico & Analisi Spese</h2>
 
     <div class="stats-bar" id="stats">
       <div class="stats-row">
@@ -300,6 +320,11 @@
         <span>Stima Idee: <b id="stat-ideas">€ 0.00</b></span>
         <span>Spesa Totale prevista: <b id="stat-total">€ 0.00</b></span>
       </div>
+    </div>
+
+    <!-- GRAFICO SPESE PER OCCASIONE -->
+    <div class="chart-container">
+      <canvas id="expenseChart"></canvas>
     </div>
 
     <!-- BARRA FILTRI -->
@@ -346,7 +371,7 @@
 </div>
 
 <script>
-  const SECRET_PASSWORD = "Regali2026";
+  const SECRET_PASSWORD = "Regali2026!";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBlCGHnL0lksp2yt34bB3z3VPY_cUZgdb0",
@@ -362,6 +387,8 @@
   const db = firebase.database().ref('registro_regali');
 
   let gifts = [];
+  let editingId = null;
+  let chartInstance = null;
 
   function checkAuth() {
     const savedPass = localStorage.getItem('regali_auth_token');
@@ -414,7 +441,6 @@
     const yearSelect = document.getElementById('filter-year');
     const selectedYear = yearSelect.value;
     
-    // Ottieni lista di anni unici dai regali presenti
     const years = [...new Set(gifts.map(g => g.year))].sort((a, b) => b - a);
     
     let html = '<option value="">Tutti gli anni</option>';
@@ -426,7 +452,7 @@
     yearSelect.value = selectedYear;
   }
 
-  function addGift() {
+  function saveGift() {
     const person = document.getElementById('person').value.trim();
     const occasion = document.getElementById('occasion').value;
     const giftName = document.getElementById('gift').value.trim();
@@ -442,9 +468,9 @@
 
     const btn = document.getElementById('btn-save');
     btn.disabled = true;
-    btn.innerText = 'Salvataggio...';
+    btn.innerText = editingId ? 'Aggiornamento...' : 'Salvataggio...';
 
-    db.push({
+    const payload = {
       person,
       occasion,
       giftName,
@@ -453,19 +479,54 @@
       year,
       notes,
       timestamp: Date.now()
-    }).then(() => {
-      btn.disabled = false;
-      btn.innerText = 'Salva Regalo nel Cloud';
+    };
 
-      document.getElementById('person').value = '';
-      document.getElementById('gift').value = '';
-      document.getElementById('price').value = '';
-      document.getElementById('notes').value = '';
+    const promise = editingId 
+      ? db.child(editingId).update(payload)
+      : db.push(payload);
+
+    promise.then(() => {
+      btn.disabled = false;
+      resetForm();
     }).catch((err) => {
       btn.disabled = false;
-      btn.innerText = 'Salva Regalo nel Cloud';
-      alert("Impossibile salvare il regalo: " + err.message);
+      btn.innerText = editingId ? 'Aggiorna Regalo' : 'Salva Regalo nel Cloud';
+      alert("Errore durante il salvataggio: " + err.message);
     });
+  }
+
+  function editGift(id) {
+    const gift = gifts.find(g => g.id === id);
+    if (!gift) return;
+
+    editingId = id;
+    document.getElementById('person').value = gift.person || '';
+    document.getElementById('occasion').value = gift.occasion || 'Compleanno';
+    document.getElementById('gift').value = gift.giftName || '';
+    document.getElementById('status').value = gift.status || 'bought';
+    document.getElementById('price').value = gift.price || '';
+    document.getElementById('year').value = gift.year || new Date().getFullYear();
+    document.getElementById('notes').value = gift.notes || '';
+
+    document.getElementById('form-title').innerText = '✏️ Modifica Regalo';
+    document.getElementById('btn-save').innerText = 'Aggiorna Regalo';
+    document.getElementById('btn-cancel').style.display = 'block';
+
+    document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    editingId = null;
+    document.getElementById('person').value = '';
+    document.getElementById('gift').value = '';
+    document.getElementById('price').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('year').value = new Date().getFullYear();
+    document.getElementById('status').value = 'bought';
+
+    document.getElementById('form-title').innerText = 'Aggiungi Regalo o Idea';
+    document.getElementById('btn-save').innerText = 'Salva Regalo nel Cloud';
+    document.getElementById('btn-cancel').style.display = 'none';
   }
 
   function toggleStatus(id, currentStatus) {
@@ -475,7 +536,54 @@
 
   function deleteGift(id) {
     if (confirm("Vuoi davvero eliminare questo elemento?")) {
-      db.child(id).remove().catch(err => alert("Errore eliminazione: " + err.message));
+      db.child(id).remove().then(() => {
+        if (editingId === id) resetForm();
+      }).catch(err => alert("Errore eliminazione: " + err.message));
+    }
+  }
+
+  function updateChart(dataByOccasion) {
+    const ctx = document.getElementById('expenseChart').getContext('2d');
+    const labels = Object.keys(dataByOccasion);
+    const dataValues = Object.values(dataByOccasion);
+
+    if (labels.length === 0) {
+      if (chartInstance) chartInstance.destroy();
+      return;
+    }
+
+    const colors = [
+      '#0d9488', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#64748b'
+    ];
+
+    if (chartInstance) {
+      chartInstance.data.labels = labels;
+      chartInstance.data.datasets[0].data = dataValues;
+      chartInstance.update();
+    } else {
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: colors.slice(0, labels.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.label}: € ${context.raw.toFixed(2)}`;
+                }
+              }
+            }
+          }
+        }
+      });
     }
   }
 
@@ -499,9 +607,10 @@
       return matchSearch && matchYear && matchOccasion && matchStatus;
     });
 
-    // Calcolo Statistiche
+    // Calcolo Statistiche e Dati Grafico
     let totalBought = 0;
     let totalIdeas = 0;
+    const occasionTotals = {};
 
     filteredGifts.forEach(g => {
       const p = g.price || 0;
@@ -509,6 +618,9 @@
         totalIdeas += p;
       } else {
         totalBought += p;
+        // Raggruppamento per il grafico delle spese reali
+        const occ = g.occasion || 'Altro';
+        occasionTotals[occ] = (occasionTotals[occ] || 0) + p;
       }
     });
 
@@ -516,6 +628,8 @@
     document.getElementById('stat-bought').innerText = '€ ' + totalBought.toFixed(2);
     document.getElementById('stat-ideas').innerText = '€ ' + totalIdeas.toFixed(2);
     document.getElementById('stat-total').innerText = '€ ' + (totalBought + totalIdeas).toFixed(2);
+
+    updateChart(occasionTotals);
 
     if (filteredGifts.length === 0) {
       listEl.innerHTML = '<p style="color: #64748b; text-align: center; margin-top: 20px;">Nessun regalo trovato con i filtri selezionati.</p>';
@@ -548,6 +662,7 @@
             <div class="price-tag">${g.price > 0 ? '€ ' + Number(g.price).toFixed(2) : '-'}</div>
             <div class="actions-group">
               <button class="btn-action btn-toggle-status" onclick="toggleStatus('${g.id}', '${g.status || 'bought'}')">${statusActionText}</button>
+              <button class="btn-action btn-edit" onclick="editGift('${g.id}')">Modifica</button>
               <button class="btn-action btn-delete" onclick="deleteGift('${g.id}')">Elimina</button>
             </div>
           </div>
